@@ -7,7 +7,7 @@ pipe_commands = [
 ];
 
 // receiver_end = shlex_quote("wc -c");
-join_command = 'ssh localhost mooltipath join -p /tmp/mooltipath_stream1 /tmp/mooltipath_stream2 -c "wc -c" '
+join_command = 'ssh localhost mooltipath join -p /tmp/mooltipath_stream1 /tmp/mooltipath_stream2 -c /home/koom/x.sh '
 
 
 chunks = [];
@@ -63,10 +63,9 @@ program
 program
 	.command('join')
 	.option('-p, --pipes [pipes...]', 'pipes to read')
-	.option('-c, --command <command>', 'command to run')
+	.option('-c, --command <string>', 'command to run')
 	.action(({pipes, command}) =>
 	{
-		console.debug('hio');
 		console.debug('pipes:');
 		console.debug(pipes);
 		pipes.forEach((p) =>
@@ -80,6 +79,7 @@ program
 				console.log(d);
 			})
 		});
+		console.log(`command: ${command}`);
 	});
 
 function try_send_chunks()
@@ -155,7 +155,10 @@ function create_pipe(cmd)
 
 function spawn(cmd)
 {
-	const proc = child_process.spawn(cmd[0], cmd.slice(1));
+	const file = cmd[0];
+	const args = cmd.slice(1);
+	console.debug(`spawn ${file} with args ${args}`);
+	const proc = child_process.spawn(file, args);
 
 	proc.on('close', (code) =>
 	{
