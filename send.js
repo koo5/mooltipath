@@ -23,7 +23,11 @@ w.program
 		console.debug('send..');
 		w.spawn(w.shlex.split(join_command));
 
-		drains = [create_pipe(w.shlex.split(pipe_commands[0])), create_pipe(w.shlex.split(pipe_commands[1]))];
+		drains = [w.spawn(w.shlex.split(pipe_commands[0])), w.spawn(w.shlex.split(pipe_commands[1]))];
+		drains.forEach((p) =>
+		{
+
+		});
 
 		process.stdin.on('data', data =>
 		{
@@ -50,7 +54,11 @@ w.program
 		process.stdin.on('close', () =>
 		{
 			console.log(`This is the end of stdin.`);
-			drains.forEach((p) => p.stdin.end());
+			drains.forEach((p) =>
+			{
+				p.stdin.end();
+				//p.kill('SIGHUP');
+			});
 		});
 	});
 
@@ -75,7 +83,9 @@ function try_send_chunk(ch)
 	//pipe.write(JSON.stringify({'id': ch.id, 'size': ch.data.length}))
 	//pipe.write(ch.data);
 
-	pipe.write(w.cbor.encode({'id': ch.id, 'data': ch.data}))
+	const msg = {'id': ch.id, 'data': ch.data};
+	pipe.write(w.cbor.encode(msg));
+	console.info(`wrote: ${JSON.stringify(msg)}`);
 
 	return true;
 }
@@ -105,26 +115,5 @@ function pick_next_drain()
 function current_drain()
 {
 	return drains[current_drain_id];
-}
-
-function create_pipe(cmd)
-{
-	const proc = w.child_process.spawn(cmd[0], cmd.slice(1));
-
-	proc.on('close', (code) =>
-	{
-		console.debug(`child process exited with code ${code}`);
-	});
-
-	proc.stdout.on('data', (data) =>
-	{
-		console.debug(`stdout: ${data}`);
-	});
-
-	proc.stderr.on('data', (data) =>
-	{
-		console.error(`stderr: ${data}`);
-	});
-	return proc;
 }
 

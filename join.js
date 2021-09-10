@@ -19,17 +19,16 @@ w.program
 
 		receiver = w.spawn(w.shlex.split(command));
 
-		console.debug('pipes:');
-		console.debug(pipes);
+		console.debug(`pipes: ${pipes}`);
 
 		const sources = pipes.forEach((p) =>
 		{
 			const stream = w.fs.createReadStream(p);
 			const decoder = new w.cbor.Decoder();
 			stream.pipe(decoder);
-			const source = {fn:p,buffer:[]}
+			const source = {fn:p}
 
-			process.stdin.on('decoder', () =>
+			process.stdin.on('end', () =>
 			{
 				console.log(`This is the end of decoder.`);
 				sources.splice(sources.indexOf(source), 1);
@@ -40,10 +39,11 @@ w.program
 			decoder.on('error', function(err) {
     			console.error(err);
   			});
+
 			decoder.on('data', (d) =>
 			{
 				const chunk_id = d.id;
-				console.log(chunk_id);
+				console.warn(`got chunk_id: ${chunk_id}`);
 				chunks.insertOne(d);
 				try_pop();
 			})

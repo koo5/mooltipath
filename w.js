@@ -23,7 +23,7 @@ function spawn(cmd)
 
 	proc.on('close', (code) =>
 	{
-		console.debug(`child process exited with code ${code}`);
+		console.debug(`child process ${cmd} exited with code ${code}`);
 	});
 
 	proc.stdout.on('data', (data) =>
