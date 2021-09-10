@@ -1,18 +1,20 @@
+"use strict";
+
 //CHUNK_SIZE_BYTES = 1000000000; // 1GB
 
 
-pipe_commands = [
+const pipe_commands = [
 	'ssh localhost "cat > /tmp/mooltipath_stream1"',
 	'ssh localhost "cat > /tmp/mooltipath_stream2"',
 ];
 
 // receiver_end = shlex_quote("wc -c");
-join_command = 'ssh localhost mooltipath join -p /tmp/mooltipath_stream1 /tmp/mooltipath_stream2 -c /home/koom/x.sh '
+const join_command = 'ssh localhost mooltipath join -p /tmp/mooltipath_stream1 /tmp/mooltipath_stream2 -c cat '
 
 
-chunks = [];
+const chunks = [];
 var next_chunk_id = 0;
-drains = [];
+let drains = [];
 var current_drain_id = 0;
 const w = require('./w.js');
 
@@ -24,8 +26,17 @@ w.program
 		w.spawn(w.shlex.split(join_command));
 
 		drains = [w.spawn(w.shlex.split(pipe_commands[0])), w.spawn(w.shlex.split(pipe_commands[1]))];
-		drains.forEach((p) =>
+		drains.forEach((d) =>
 		{
+			d.on('close', (code) =>
+			{
+				drains.splice(drains.indexOf(d),1);
+				console.debug(`remaining drains: ${drains.length}`);
+				if (drains.length === 0)
+				{
+					console.debug(`done.`);
+				}
+			});
 
 		});
 
@@ -93,7 +104,7 @@ function try_send_chunk(ch)
 
 function try_pick_next_free_drain()
 {
-	tried_pipes = [];
+	let tried_pipes = [];
 	while (tried_pipes.length < drains.length)
 	{
 		pick_next_drain();

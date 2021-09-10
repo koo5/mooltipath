@@ -1,3 +1,5 @@
+"use strict";
+
 const child_process = require('child_process');
 const fs = require('fs');
 const buffer = require('buffer');
@@ -13,27 +15,33 @@ exports.buffer = buffer;
 exports.fs = fs;
 exports.child_process = child_process;
 
+const child_processess = [];
 
 function spawn(cmd)
 {
 	const file = cmd[0];
 	const args = cmd.slice(1);
-	console.debug(`spawn ${file} with args ${args}`);
+
 	const proc = child_process.spawn(file, args);
+
+	console.debug(`spawned ${file} with args ${args} with pid ${proc.pid}`);
+	child_processess.push(proc);
+
 
 	proc.on('close', (code) =>
 	{
-		console.debug(`child process ${cmd} exited with code ${code}`);
+		child_processess.splice(child_processess.indexOf(proc),1)
+		console.debug(`child process ${cmd} (${proc.pid}) exited with code ${code}, remaining subprocessess: ${child_processess.length} `);
 	});
 
 	proc.stdout.on('data', (data) =>
 	{
-		console.debug(`stdout: ${data}`);
+		console.debug(`(${proc.pid})stdout: ${data}`);
 	});
 
 	proc.stderr.on('data', (data) =>
 	{
-		console.error(`stderr: ${data}`);
+		console.error(`(${proc.pid})stderr: ${data}`);
 	});
 
 	return proc;

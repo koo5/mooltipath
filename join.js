@@ -1,4 +1,4 @@
-
+"use strict";
 
 const SortedList = require('sortedlist');
 const w = require('./w.js');
@@ -6,7 +6,7 @@ const w = require('./w.js');
 
 var chunks = new SortedList({compare(a,b){return a.id - b.id}});
 var next_chunk_id = 0;
-
+var receiver;
 
 
 w.program
@@ -15,20 +15,27 @@ w.program
 	.option('-c, --command <string>', 'command to run')
 	.action(({pipes, command}) =>
 	{
-		console.debug(`command: ${command}`);
+		console.debug(`receiver command: ${command}`);
 
 		receiver = w.spawn(w.shlex.split(command));
+		receiver.on('close', (code) =>
+		{
+			console.debug(`${receiver.pid} closed with code ${code}. exiting.`);
+			process.exit(code);
+		})
 
 		console.debug(`pipes: ${pipes}`);
 
-		const sources = pipes.forEach((p) =>
+		const sources = [];
+		pipes.forEach((p) =>
 		{
 			const stream = w.fs.createReadStream(p);
 			const decoder = new w.cbor.Decoder();
 			stream.pipe(decoder);
 			const source = {fn:p}
+			sources.push(source);
 
-			process.stdin.on('end', () =>
+			decoder.on('end', () =>
 			{
 				console.log(`This is the end of decoder.`);
 				sources.splice(sources.indexOf(source), 1);
@@ -49,7 +56,6 @@ w.program
 			})
 			return source;
 		});
-		console.log(`command: ${command}`);
 	});
 
 function try_pop()
