@@ -1,5 +1,6 @@
 "use strict";
 
+const JSONStream = require('JSONStream')
 const child_process = require('child_process');
 const fs = require('fs');
 const buffer = require('buffer');
@@ -51,3 +52,19 @@ function spawn(cmd, opts)
 }
 
 exports.spawn = spawn;
+
+
+
+/*
+exports.serialize = cbor.encode;
+exports.new_deserializer = ()
+{
+	return new w.cbor.Decoder()
+}
+*/
+
+exports.serialize = JSON.stringify;
+exports.new_deserializer = () =>
+{
+	return JSONStream.parse();
+}

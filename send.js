@@ -11,8 +11,8 @@ var joiner;
 
 
 const fifo_paths = [
-	'/tmp/mooltipath_stream1',
-	'/tmp/mooltipath_stream2',
+//	'/tmp/mooltipath_stream1',
+//	'/tmp/mooltipath_stream2',
 ];
 
 const pipe_commands = fifo_paths.map(p => `ssh localhost cat > "${p}"`);
@@ -29,15 +29,18 @@ w.program
 	{
 		joiner = w.spawn(join_command);
 		send_cmd({'cmd':'spawn_receiver','args':receiver_command});
+		drains.push(joiner);
 		fifo_paths.forEach(p =>
 		{
 			send_cmd({'cmd':'add_pipe','args':p});
 		});
 		
-		drains = [w.spawn(w.shlex.split(pipe_commands[0])), w.spawn(w.shlex.split(pipe_commands[1]))];
-		drains.forEach((d) =>
+		let named_fifo_writers_procs = pipe_commands.map(c => w.spawn(w.shlex.split(c)));
+		
+		named_fifo_writers_procs.forEach((d) =>
 		{
-			d.on('close', (code) =>
+			drains.push(d);
+			d.stdin.on('close', (code) =>
 			{
 				drains.splice(drains.indexOf(d),1);
 				console.debug(`remaining drains: ${drains.length}`);
@@ -46,7 +49,6 @@ w.program
 					console.debug(`done.`);
 				}
 			});
-
 		});
 
 		process.stdin.on('data', data =>
@@ -61,7 +63,7 @@ w.program
 					process.stdin.pause();
 					drains.forEach((p) =>
 					{
-						p.once('drain', () =>
+						p.stdin.once('drain', () =>
 						{
 							process.stdin.resume();
 							try_send_chunks();
@@ -87,7 +89,7 @@ function send_cmd(cmd)
 {
 	cmd.id = next_chunk_id++;
 
-	joiner.stdin.write(w.cbor.encode(cmd), (err) =>
+	joiner.stdin.write(w.serialize(cmd), (err) =>
 	{
 		if (err)
 			console.debug(err)
@@ -117,8 +119,16 @@ function try_send_chunk(ch)
 	//pipe.write(ch.data);
 
 	const msg = {'id': ch.id, 'data': ch.data};
-	const bytes = w.cbor.encode(msg);
-	pipe.write(bytes);
+	const bytes = w.serialize(msg);
+	pipe.write(bytes, (err) =>
+	{
+		if (err)
+			console.debug(err)
+		else
+			console.debug(`${JSON.stringify(bytes.length)} written successfulllly`)
+	});
+
+
 	//console.debug(`wrote: ${JSON.stringify(msg)}`);
 	console.debug(`wrote ${bytes.length} bytes..`);
 
@@ -132,7 +142,7 @@ function try_pick_next_free_drain()
 	while (tried_pipes.length < drains.length)
 	{
 		pick_next_drain();
-		const p = current_drain();
+		const p = current_drain().stdin;
 		if (!p.writableNeedDrain)
 			return true;
 		tried_pipes.push(p);
