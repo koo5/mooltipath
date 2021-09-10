@@ -25,8 +25,9 @@ const pipe_commands = fifo_paths.map(p => `ssh localhost cat > "${p}"`);
 //const receiver_command = ("wc -c")
 const receiver_command = ("cat > ~/cacat")
 
-const join_command = w.shlex.split("ssh localhost mooltipath join")
-
+//const join_command = w.shlex.split("ssh localhost mooltipath join")
+//const join_command = w.shlex.split("ssh localhost NODE_ENV=production node --prof /home/koom/mooltipath/main.js join")
+const join_command = w.shlex.split("cat");
 
 
 w.program
@@ -49,45 +50,56 @@ w.program
 			d.stdin.on('close', (code) =>
 			{
 				drains.splice(drains.indexOf(d),1);
-				console.debug(`remaining drains: ${drains.length}`);
+				w.d(`remaining drains: ${drains.length}`);
 				if (drains.length === 0)
 				{
-					console.debug(`done.`);
+					w.d(`done.`);
 				}
+			});
+		});
+
+		drains.forEach(p =>
+		{
+			p.stdin.on('drain', () =>
+			{
+				process.stdin.resume();
 			});
 		});
 
 		process.stdin.on('data', data =>
 		{
-			console.debug(`I got some ${data.length} bytes`);
+			//w.d(`I got some ${data.length} bytes`);
 			chunks.push({'id': next_chunk_id++, 'data': data});
+			const max = 10;
+			if (chunks.length > max)
+			{
+				w.d(`chunks buffer has more than ${max} items.`);
+				//process.stdin.pause();
+			}
+
 			if (try_send_chunks() === false)
 			{
-				console.debug('all drains are busy');
-				if (chunks.length > 100000)
+				w.d('all drains are busy');
 				{
+					//w.d(`all drains are busy and chunks buffer has more than ${max} items, pausing stdin.`);
 					process.stdin.pause();
-					drains.forEach((p) =>
-					{
-						p.stdin.once('drain', () =>
-						{
-							process.stdin.resume();
-						})
-					})
 				}
 			}
 		});
 
 		process.stdin.on('close', () =>
 		{
-			setTimeout(flush, 1000);
-			console.debug(`This is the end of data piped to sender.`);
+			w.d(`This is the end of data piped to sender.`);
+			setInterval(flush, 1000);
 		});
 		
 		function flush()
 		{
+			w.d(`sender flush..`);
 			if (try_send_chunks())
 			{
+				w.d(`try_send_chunks ok`);
+				w.d(`remaining drains: ${drains.length}`);
 				drains.forEach((p) =>
 				{
 					p.stdin.end();
@@ -102,15 +114,23 @@ w.program
 function send_cmd(cmd)
 {
 	cmd.id = next_chunk_id++;
+	w.d(`write: ${JSON.stringify(cmd)}`);
+	do_write(joiner.stdin, cmd);
+}
 
-	joiner.stdin.write(w.serialize(cmd), (err) =>
+function do_write(stream, json)
+{
+	const bytes = w.serialize(json);
+	w.d(`write ${bytes.length} bytes..`);
+	return stream.write(bytes, (err) =>
 	{
 		if (err)
-			console.debug(err)
+			w.d(err)
 		else
-			console.debug(`${JSON.stringify(cmd)} written successfulllly`)
+			w.d(`${JSON.stringify(bytes.length)} written successfulllly`)
 	});
 }
+
 
 function try_send_chunks()
 {
@@ -129,22 +149,8 @@ function try_send_chunk(ch)
 	if (!try_pick_next_free_drain())
 		return false;
 	const pipe = current_drain().stdin;
-
 	const msg = {'id': ch.id, 'data': ch.data};
-	const bytes = w.serialize(msg);
-	if (!pipe.write(bytes, (err) =>
-	{
-		if (err)
-			console.debug(err)
-		else
-			console.debug(`${JSON.stringify(bytes.length)} written successfulllly`)
-	}))
-		return false;
-
-	//console.debug(`wrote: ${JSON.stringify(msg)}`);
-	console.debug(`wrote ${bytes.length} bytes..`);
-
-	return true;
+	return do_write(pipe, msg);
 }
 
 
@@ -159,6 +165,7 @@ function try_pick_next_free_drain()
 			return true;
 		tried_pipes.push(p);
 	}
+	w.d('no free drains.');
 	return false;
 }
 

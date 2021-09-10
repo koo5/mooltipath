@@ -28,19 +28,20 @@ function spawn(cmd, opts)
 
 	const proc = child_process.spawn(file, args, opts);
 
-	console.debug(`spawned ${file} with args ${args} with pid ${proc.pid}`);
+	d(`spawned ${file} with args ${args} with pid ${proc.pid}`);
 	child_processess.push(proc);
 
 
 	proc.on('close', (code) =>
 	{
 		child_processess.splice(child_processess.indexOf(proc),1)
-		console.debug(`child process ${cmd} (${proc.pid}) exited with code ${code}, remaining subprocessess: ${child_processess.length} `);
+		d(`child process ${cmd} (${proc.pid}) exited with code ${code}, remaining subprocessess: ${child_processess.length} `);
 	});
 
 	proc.stdout.on('data', (data) =>
 	{
-		console.debug(`(${proc.pid})stdout: ${data}`);
+		//d(`(${proc.pid})stdout:`);
+		process.stdout.write(data);
 	});
 
 	proc.stderr.on('data', (data) =>
@@ -55,16 +56,22 @@ exports.spawn = spawn;
 
 
 
-/*
-exports.serialize = cbor.encode;
-exports.new_deserializer = ()
-{
-	return new w.cbor.Decoder()
-}
-*/
 
+exports.serialize = cbor.encode;
+exports.new_deserializer = () =>
+{
+	return new cbor.Decoder();
+}
+
+/*
 exports.serialize = JSON.stringify;
 exports.new_deserializer = () =>
 {
 	return JSONStream.parse();
 }
+*/
+
+
+//new Console(process.stderr, process.stderr);
+const d = console.warn;
+exports.d = d;
