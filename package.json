@@ -9,6 +9,7 @@
   "author": "",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
-    "commander": "^8.1.0"
+    "commander": "^8.1.0",
+    "shlex": "^2.1.0"
   }
 }

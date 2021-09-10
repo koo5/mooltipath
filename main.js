@@ -1,26 +1,34 @@
-CHUNK_SIZE_BYTES = 1000000000; // 1GB
+//CHUNK_SIZE_BYTES = 1000000000; // 1GB
 
 
 pipe_commands = [
-	'ssh localhost mooltipath join stream1',
-	'ssh localhost mooltipath join stream1',
+	'ssh localhost "mbuffer > /tmp/mooltipath_stream1"',
+	'ssh localhost "mbuffer > /tmp/mooltipath_stream2"',
 ];
+
+// receiver_end = shlex_quote("wc -c");
+join_command = 'ssh localhost mooltipath join -p /tmp/mooltipath_stream1 /tmp/mooltipath_stream2 -c "wc -c" '
+
 
 chunks = [];
 var next_chunk_id = 0;
 drains = [];
 var current_drain_id = 0;
 
-const {spawn} = require('child_process');
-
+const child_process = require('child_process');
+const fs = require('fs');
+const shlex = require("shlex");
 const {Command} = require('commander');
-const program = new Command();
-program.version('0.0.1')
-	.command('split')
+const program = new Command().version('0.0.1');
+
+program
+	.command('send')
 	.action(() =>
 	{
+		console.debug('send..');
+		spawn(shlex.split(join_command));
 
-		drains = [create_pipe(), create_pipe()];
+		drains = [create_pipe(shlex.split(pipe_commands[0])), create_pipe(shlex.split(pipe_commands[1]))];
 
 		process.stdin.on('data', data =>
 		{
@@ -51,6 +59,28 @@ program.version('0.0.1')
 		});
 	});
 
+
+program
+	.command('join')
+	.option('-p, --pipes [pipes...]', 'pipes to read')
+	.option('-c, --command <command>', 'command to run')
+	.action(({pipes, command}) =>
+	{
+		console.debug('hio');
+		console.debug('pipes:');
+		console.debug(pipes);
+		pipes.forEach((p) =>
+		{
+			const s = fs.createReadStream(p);
+			s.on('error', function(err) {
+    			console.error(err);
+  			});
+			s.on('data', (d) =>
+			{
+				console.log(d);
+			})
+		});
+	});
 
 function try_send_chunks()
 {
@@ -103,22 +133,45 @@ function current_drain()
 
 function create_pipe(cmd)
 {
-	const proc = spawn('ssh', ['localhost', 'wc', '-c']);
+	const proc = child_process.spawn(cmd[0], cmd.slice(1));
 
 	proc.on('close', (code) =>
 	{
-		console.log(`child process exited with code ${code}`);
+		console.debug(`child process exited with code ${code}`);
 	});
 
 	proc.stdout.on('data', (data) =>
 	{
-		console.log(`stdout: ${data}`);
+		console.debug(`stdout: ${data}`);
 	});
 
 	proc.stderr.on('data', (data) =>
 	{
 		console.error(`stderr: ${data}`);
 	});
+	return proc;
+}
+
+
+function spawn(cmd)
+{
+	const proc = child_process.spawn(cmd[0], cmd.slice(1));
+
+	proc.on('close', (code) =>
+	{
+		console.debug(`child process exited with code ${code}`);
+	});
+
+	proc.stdout.on('data', (data) =>
+	{
+		console.debug(`stdout: ${data}`);
+	});
+
+	proc.stderr.on('data', (data) =>
+	{
+		console.error(`stderr: ${data}`);
+	});
+
 	return proc;
 }
 
