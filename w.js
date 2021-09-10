@@ -17,12 +17,15 @@ exports.child_process = child_process;
 
 const child_processess = [];
 
-function spawn(cmd)
+function spawn(cmd, opts)
 {
+	if (opts === undefined)
+		opts = {};
+		
 	const file = cmd[0];
 	const args = cmd.slice(1);
 
-	const proc = child_process.spawn(file, args);
+	const proc = child_process.spawn(file, args, opts);
 
 	console.debug(`spawned ${file} with args ${args} with pid ${proc.pid}`);
 	child_processess.push(proc);

@@ -1,13 +1,6 @@
 "use strict";
 
 
-const pipe_commands = [
-	'ssh localhost "cat > /tmp/mooltipath_stream1"',
-	'ssh localhost "cat > /tmp/mooltipath_stream2"',
-];
-
-const join_command = "ssh localhost mooltipath join -p /tmp/mooltipath_stream1 /tmp/mooltipath_stream2 -c wc -c"
-
 
 const chunks = [];
 var next_chunk_id = 0;
@@ -15,13 +8,32 @@ let drains = [];
 var current_drain_id = 0;
 const w = require('./w.js');
 
+
+
+const fifo_paths = [
+	'/tmp/mooltipath_stream1"',
+	'/tmp/mooltipath_stream2"',
+];
+
+const pipe_commands = fifo_paths.map(p => `ssh localhost "cat > ${p}`);
+
+
+const receiver_command = ("wc -c")
+const join_command = w.shlex.split("ssh localhost mooltipath join")
+
+
+
 w.program
 	.command('send')
 	.action(() =>
 	{
-		console.debug('send..');
-		w.spawn(w.shlex.split(join_command));
-
+		const joiner = w.spawn(join_command);
+		joiner.stdin.write(w.cbor.encode({'cmd':'spawn_receiver','args':receiver_command}));
+		fifo_paths.forEach(p =>
+		{
+			joiner.stdin.write(w.cbor.encode({'cmd':'add_pipe','args':p}));
+		});
+		
 		drains = [w.spawn(w.shlex.split(pipe_commands[0])), w.spawn(w.shlex.split(pipe_commands[1]))];
 		drains.forEach((d) =>
 		{
@@ -61,7 +73,7 @@ w.program
 
 		process.stdin.on('close', () =>
 		{
-			console.debug(`This is the end of stdin.`);
+			console.debug(`This is the end of data piped to sender.`);
 			drains.forEach((p) =>
 			{
 				//p.stdin.end();

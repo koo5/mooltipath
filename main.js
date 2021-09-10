@@ -4,5 +4,10 @@ const send = require('./send.js');
 const join = require('./join.js');
 const w = require('./w.js');
 
+
+
 w.program.parse();
 
+
+console.log(process.argv);
+console.log(w.program.opts());

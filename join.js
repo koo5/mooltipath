@@ -11,29 +11,34 @@ var receiver;
 
 w.program
 	.command('join')
-	.option('-p, --pipes <pipes...>', 'pipes to read')
-	.option('-c, --command [string...]', 'command to run')
-	.action(({pipes, command}) =>
+	.action(() =>
 	{
-		console.debug(`receiver command: ${command}`);
-
-		receiver = w.spawn((command));
-		receiver.on('close', (code) =>
-		{
-			console.debug(`${receiver.pid} closed with code ${code}. exiting.`);
-			process.exit(code);
-		})
-
-		console.debug(`pipes: ${pipes}`);
-
 		const sources = [];
-		pipes.forEach((p) =>
+		let this_decoder = new w.cbor.Decoder(process.stdin);
+		add_message_stream(this_decoder);
+	
+		function maybe_process_command(d)
 		{
-			const stream = w.fs.createReadStream(p);
+			if (d.cmd)
+				console.debug(`cmd: ${d.cmd}, args: ${d.args}`);
+			if (d.cmd === 'spawn_receiver')
+				spawn_receiver(d.args)
+			if (d.cmd === 'add_pipe')
+				add_unix_named_pipe(d.args)
+		}
+		
+		function add_unix_named_pipe(fn)
+		{
+			console.debug(`add pipe: ${fn}`);
+			const stream = w.fs.createReadStream(fn);
 			const decoder = new w.cbor.Decoder();
 			stream.pipe(decoder);
+			add_message_stream(decoder);
+		}
 
-			const source = {fn:p}
+		function add_message_stream(decoder)
+		{
+			const source = {decoder}
 			sources.push(source);
 			console.debug(`sources: ${sources.length}`);
 
@@ -42,11 +47,6 @@ w.program
 				console.debug(`This is the end of decoder.`);
 				sources.splice(sources.indexOf(source), 1);
 				console.debug(`sources: ${sources.length}`);
-				/*
-				not until chunks.length === 0!
-				if (sources.length < 1)
-					receiver.stdin.end();
-				 */
 			});
 
 			decoder.on('error', function(err) {
@@ -57,26 +57,41 @@ w.program
 			{
 				const chunk_id = d.id;
 				console.debug(`got chunk_id: ${chunk_id}`);
+				maybe_process_command(d);
 				chunks.insertOne(d);
 				try_pop();
 			})
-
-			return source;
-		});
+		}
 	});
 
 function try_pop()
 {
 	if (chunks.length === 0)
+	{
+		/*if (sources.length < 1)
+			receiver.stdin.end();*/
 		return;
+	}
 	var d = chunks[0];
 	while (d && next_chunk_id === d.id)
 	{
 		chunks.shift();
-		receiver.stdin.write(d.data)
+		if (d.data !== undefined)
+			receiver.stdin.write(d.data)
 		next_chunk_id += 1;
 		d = chunks[0];
 	}
 	if (chunks.length > 5)
 		console.warn(`still waiting for chunk ${next_chunk_id}..`);
+}
+
+function spawn_receiver(command)
+{
+	console.debug(`receiver command: ${command}`);
+	receiver = w.spawn(command, {'shell':true});
+	receiver.on('close', (code) =>
+	{
+		console.debug(`${receiver.pid} closed with code ${code}. exiting.`);
+		process.exit(code);
+	});
 }
