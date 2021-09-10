@@ -36,7 +36,16 @@ w.program
 				console.debug(`This is the end of decoder.`);
 				sources.splice(sources.indexOf(source), 1);
 				console.debug(`sources: ${sources.length}`);
+				if (sources.length < 1)
+					setTimeout(final_flush, 1000);
 			});
+			
+			function final_flush()
+			{
+				try_pop();
+				if (chunks.length < 1)
+					receiver.stdin.end();
+			}
 			
 			decoder.on('error', function (err)
 			{
@@ -47,6 +56,7 @@ w.program
 			{
 				const chunk_id = d.id;
 				console.debug(`got chunk_id: ${chunk_id}`);
+				d.data = json_buffer_serialization_fixup(d.data);
 				maybe_process_command(d);
 				chunks.insertOne(d);
 				try_pop();
@@ -77,46 +87,53 @@ w.program
 
 function try_pop()
 {
-	console.debug(`try_pop(${JSON.stringify(chunks)})`);
+	console.debug(`try_pop(${JSON.stringify(chunks.length)})`);
+	//console.debug(`try_pop(${JSON.stringify(chunks)})`);
 	console.debug(`next_chunk_id:${JSON.stringify(next_chunk_id)}`);
 	
-	if (chunks.length === 0)
-	{
-		/*if (sources.length < 1)
-			receiver.stdin.end();*/
-		return;
-	}
 	var d = chunks[0];
 	while (d && next_chunk_id === d.id)
 	{
 		chunks.shift();
-		if (d.data !== undefined)
-			receiver.stdin.write(json_buffer_serialization_fixup(d.data));
 		next_chunk_id += 1;
+		if (d.data !== undefined)
+			if (!receiver.stdin.write((d.data)))
+			{
+				console.debug('buffer full, take a break..');
+				return false;
+			}
 		d = chunks[0];
 	}
 	if (chunks.length > 5)
 		console.warn(`still waiting for chunk ${next_chunk_id}..`);
-	console.debug(`done try_pop(${JSON.stringify(chunks)})`);
+	//console.debug(`done try_pop(${JSON.stringify(chunks)})`);
+	console.debug(`done try_pop(${JSON.stringify(chunks.length)})`);
+	return true;
 }
 
 function spawn_receiver(command)
 {
 	console.debug(`receiver command: ${command}`);
 	receiver = w.spawn([command], {'shell': true});
+	receiver.on('drain', () =>
+	{
+		try_pop();
+	});
 	receiver.on('close', (code) =>
 	{
 		console.debug(`${receiver.pid} closed with code ${code}. exiting.`);
 		process.exit(code);
 	});
+	
+	
 }
 
 function json_buffer_serialization_fixup(d)
 {
-	
+	if (!d)
+		return;
 	if (!(d instanceof Buffer))
-		d = new Buffer(d.data);
+		d = Buffer.from(d.data);
 	return d
-	
 	
 }

@@ -2,6 +2,10 @@
 
 
 
+var END_IS_NEAR
+
+
+
 const chunks = [];
 var next_chunk_id = 0;
 let drains = [];
@@ -18,7 +22,9 @@ const fifo_paths = [
 const pipe_commands = fifo_paths.map(p => `ssh localhost cat > "${p}"`);
 
 
-const receiver_command = ("wc -c")
+//const receiver_command = ("wc -c")
+const receiver_command = ("cat > ~/cacat")
+
 const join_command = w.shlex.split("ssh localhost mooltipath join")
 
 
@@ -66,7 +72,6 @@ w.program
 						p.stdin.once('drain', () =>
 						{
 							process.stdin.resume();
-							try_send_chunks();
 						})
 					})
 				}
@@ -75,15 +80,24 @@ w.program
 
 		process.stdin.on('close', () =>
 		{
+			setTimeout(flush, 1000);
 			console.debug(`This is the end of data piped to sender.`);
-			drains.forEach((p) =>
-			{
-				//p.stdin.end();
-				// not until all chunks are written.
-				//p.kill('SIGHUP');
-			});
 		});
+		
+		function flush()
+		{
+			if (try_send_chunks())
+			{
+				drains.forEach((p) =>
+				{
+					p.stdin.end();
+				});
+			}
+		}
+		
 	});
+
+
 
 function send_cmd(cmd)
 {
@@ -115,19 +129,17 @@ function try_send_chunk(ch)
 	if (!try_pick_next_free_drain())
 		return false;
 	const pipe = current_drain().stdin;
-	//pipe.write(JSON.stringify({'id': ch.id, 'size': ch.data.length}))
-	//pipe.write(ch.data);
 
 	const msg = {'id': ch.id, 'data': ch.data};
 	const bytes = w.serialize(msg);
-	pipe.write(bytes, (err) =>
+	if (!pipe.write(bytes, (err) =>
 	{
 		if (err)
 			console.debug(err)
 		else
 			console.debug(`${JSON.stringify(bytes.length)} written successfulllly`)
-	});
-
+	}))
+		return false;
 
 	//console.debug(`wrote: ${JSON.stringify(msg)}`);
 	console.debug(`wrote ${bytes.length} bytes..`);
