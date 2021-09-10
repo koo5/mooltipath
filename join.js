@@ -4,14 +4,21 @@ const SortedList = require('sortedlist');
 const w = require('./w.js');
 
 
+/** messages that came. We sort them by id. We store both commands and data chunks, but we process commands immediately when received, but we keep them in the list until all lower-id messages are processed (an absence of a message in this list signifies that it wasnt received) */
 var chunks = new SortedList({
 	compare: (a, b) =>
 	{
 		return a.id - b.id
 	}
 });
+
+/* to detect a missing message */
 var next_chunk_id = 0;
+
+/* the command that the user actually wants to run, on the remote machine here */
 var receiver;
+
+/* open streams that messages can come through */
 const sources = [];
 
 w.program
@@ -19,7 +26,9 @@ w.program
 	.action(() =>
 	{
 		
+		/* the master channel */
 		add_message_stream(process.stdin);
+		
 		
 		function add_message_stream(readable)
 		{
@@ -99,6 +108,7 @@ w.program
 	});
 
 function try_pop()
+/* return false if receiver is busy */
 {
 	//w.d(`try_pop(${JSON.stringify(chunks.length)})`);
 	//w.d(`try_pop(${JSON.stringify(chunks)})`);
@@ -135,6 +145,8 @@ function spawn_receiver(command)
 {
 	w.d(`receiver command: ${command}`);
 	receiver = w.spawn([command], {'shell': true});
+	
+	/* unpause sources when receiver is available for writing */
 	receiver.stdin.on('drain', () =>
 	{
 		unpause_sources();

@@ -56,20 +56,24 @@ exports.spawn = spawn;
 
 
 
-
+/*
 exports.serialize = cbor.encode;
 exports.new_deserializer = () =>
 {
 	return new cbor.Decoder();
 }
+*/
 
-/*
 exports.serialize = JSON.stringify;
 exports.new_deserializer = () =>
 {
 	return JSONStream.parse();
 }
-*/
+
+
+
+
+
 
 
 //new Console(process.stderr, process.stderr);

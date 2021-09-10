@@ -1,40 +1,57 @@
 "use strict";
 
-
-
-var END_IS_NEAR
-
-
-
-const chunks = [];
-var next_chunk_id = 0;
-let drains = [];
-var current_drain_id = 0;
 const w = require('./w.js');
+
+
+/* a list of byte arrays. Serves as a buffer for stdin data that come to us through a callback, which we have little control over. We should also have another list for a cache of transmitted messages, to be used to look up past chunks that the receiving end missed and is requesting.*/
+const chunks = [];
+
+/* id for the next message that will be transmitted (unless it will be a re-transmit) */
+var next_msg_id = 0;
+
+/* list of processess on the remote machine that we spawned. We can write messages into their stdin */
+let drains = [];
+
+/* id of the drain that was last used. We try to round-robbin them. */
+var current_drain_id = 0;
+
+
+
+/* "mooltipath join" process on the receiving machine */
 var joiner;
 
 
+/* additional fifo's on the receiving machine */
 const fifo_paths = [
 //	'/tmp/mooltipath_stream1',
 //	'/tmp/mooltipath_stream2',
 ];
 
-const pipe_commands = fifo_paths.map(p => `ssh localhost cat > "${p}"`);
+/* a list of commands for writing to additional fifos on the receiving machine */
+const fifo_commands = fifo_paths.map(p => `ssh localhost cat > "${p}"`);
+
 
 
 //const receiver_command = ("wc -c")
 const receiver_command = ("cat > ~/cacat")
 
-//const join_command = w.shlex.split("ssh localhost mooltipath join")
+
+const join_command = w.shlex.split("ssh localhost mooltipath join")
 //const join_command = w.shlex.split("ssh localhost NODE_ENV=production node --prof /home/koom/mooltipath/main.js join")
-const join_command = w.shlex.split("cat");
+//const join_command = w.shlex.split("cat");
 
 
 w.program
 	.command('send')
+	/*
+	receiver_command should be an option.
+	ssh commands for fifo_commands should be an option
+	*/
 	.action(() =>
 	{
 		joiner = w.spawn(join_command);
+		
+		/* currently, commands always go straight to the master process. But convievably, they could be sent in parallell through the other streams too. This may be helpful when the original ssh connection is severed*/
 		send_cmd({'cmd':'spawn_receiver','args':receiver_command});
 		drains.push(joiner);
 		fifo_paths.forEach(p =>
@@ -42,7 +59,7 @@ w.program
 			send_cmd({'cmd':'add_pipe','args':p});
 		});
 		
-		let named_fifo_writers_procs = pipe_commands.map(c => w.spawn(w.shlex.split(c)));
+		let named_fifo_writers_procs = fifo_commands.map(c => w.spawn(w.shlex.split(c)));
 		
 		named_fifo_writers_procs.forEach((d) =>
 		{
@@ -60,6 +77,7 @@ w.program
 
 		drains.forEach(p =>
 		{
+			/* when there is an empty drain, resume data intake */
 			p.stdin.on('drain', () =>
 			{
 				process.stdin.resume();
@@ -69,7 +87,7 @@ w.program
 		process.stdin.on('data', data =>
 		{
 			//w.d(`I got some ${data.length} bytes`);
-			chunks.push({'id': next_chunk_id++, 'data': data});
+			chunks.push({'id': next_msg_id++, 'data': data});
 			const max = 10;
 			if (chunks.length > max)
 			{
@@ -113,7 +131,7 @@ w.program
 
 function send_cmd(cmd)
 {
-	cmd.id = next_chunk_id++;
+	cmd.id = next_msg_id++;
 	w.d(`write: ${JSON.stringify(cmd)}`);
 	do_write(joiner.stdin, cmd);
 }
@@ -149,6 +167,9 @@ function try_send_chunk(ch)
 	if (!try_pick_next_free_drain())
 		return false;
 	const pipe = current_drain().stdin;
+	//const msg = {'id': ch.id, 'data': ch.data.slice(0,65480)};
+	//const msg = {'id': ch.id, 'data': ch.data.slice(0,65481)};
+	//const msg = {'id': ch.id, 'data': ch.data.slice(0,6580)};
 	const msg = {'id': ch.id, 'data': ch.data};
 	return do_write(pipe, msg);
 }
