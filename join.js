@@ -14,32 +14,16 @@ w.program
 	.action(() =>
 	{
 		const sources = [];
-		let this_decoder = new w.cbor.Decoder(process.stdin);
-		add_message_stream(this_decoder);
-	
-		function maybe_process_command(d)
-		{
-			if (d.cmd)
-				console.debug(`cmd: ${d.cmd}, args: ${d.args}`);
-			if (d.cmd === 'spawn_receiver')
-				spawn_receiver(d.args)
-			if (d.cmd === 'add_pipe')
-				add_unix_named_pipe(d.args)
-		}
 		
-		function add_unix_named_pipe(fn)
-		{
-			console.debug(`add pipe: ${fn}`);
-			const stream = w.fs.createReadStream(fn);
-			const decoder = new w.cbor.Decoder();
-			stream.pipe(decoder);
-			add_message_stream(decoder);
-		}
+		add_message_stream(process.stdin);
 
-		function add_message_stream(decoder)
+		function add_message_stream(readable)
 		{
+
+			let decoder = new w.cbor.Decoder();
 			const source = {decoder}
 			sources.push(source);
+			console.debug(`add_message_stream: ${(decoder)}`);
 			console.debug(`sources: ${sources.length}`);
 
 			decoder.on('end', () =>
@@ -61,7 +45,32 @@ w.program
 				chunks.insertOne(d);
 				try_pop();
 			})
+			
+			readable.pipe(decoder);
+
 		}
+
+	
+		function maybe_process_command(d)
+		{
+			if (d.cmd)
+				console.debug(`cmd: ${d.cmd}, args: ${d.args}`);
+			if (d.cmd === 'spawn_receiver')
+				spawn_receiver(d.args)
+			if (d.cmd === 'add_pipe')
+				add_unix_named_pipe(d.args)
+		}
+		
+		function add_unix_named_pipe(fn)
+		{
+			console.debug(`add pipe: ${fn}`);
+			const stream = w.fs.createReadStream(fn);
+			const decoder = new w.cbor.Decoder();
+			stream.pipe(decoder);
+			add_message_stream(decoder);
+		}
+
+		
 	});
 
 function try_pop()

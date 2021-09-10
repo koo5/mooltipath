@@ -7,15 +7,15 @@ var next_chunk_id = 0;
 let drains = [];
 var current_drain_id = 0;
 const w = require('./w.js');
-
+var joiner;
 
 
 const fifo_paths = [
-	'/tmp/mooltipath_stream1"',
-	'/tmp/mooltipath_stream2"',
+	'/tmp/mooltipath_stream1',
+	'/tmp/mooltipath_stream2',
 ];
 
-const pipe_commands = fifo_paths.map(p => `ssh localhost "cat > ${p}`);
+const pipe_commands = fifo_paths.map(p => `ssh localhost cat > "${p}"`);
 
 
 const receiver_command = ("wc -c")
@@ -27,11 +27,11 @@ w.program
 	.command('send')
 	.action(() =>
 	{
-		const joiner = w.spawn(join_command);
-		joiner.stdin.write(w.cbor.encode({'cmd':'spawn_receiver','args':receiver_command}));
+		joiner = w.spawn(join_command);
+		send_cmd({'cmd':'spawn_receiver','args':receiver_command});
 		fifo_paths.forEach(p =>
 		{
-			joiner.stdin.write(w.cbor.encode({'cmd':'add_pipe','args':p}));
+			send_cmd({'cmd':'add_pipe','args':p});
 		});
 		
 		drains = [w.spawn(w.shlex.split(pipe_commands[0])), w.spawn(w.shlex.split(pipe_commands[1]))];
@@ -83,6 +83,18 @@ w.program
 		});
 	});
 
+function send_cmd(cmd)
+{
+	cmd.id = next_chunk_id++;
+
+	joiner.stdin.write(w.cbor.encode(cmd), (err) =>
+	{
+		if (err)
+			console.debug(err)
+		else
+			console.debug(`${JSON.stringify(cmd)} written successfulllly`)
+	});
+}
 
 function try_send_chunks()
 {
