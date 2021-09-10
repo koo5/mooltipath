@@ -9,7 +9,10 @@
   "author": "",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
+    "cbor": "^8.0.0",
+    "cbor-monorepo": "github:hildjj/node-cbor",
     "commander": "^8.1.0",
-    "shlex": "^2.1.0"
+    "shlex": "^2.1.0",
+    "sortedlist": "^0.3.1"
   }
 }
