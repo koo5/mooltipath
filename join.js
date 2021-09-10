@@ -11,13 +11,13 @@ var receiver;
 
 w.program
 	.command('join')
-	.option('-p, --pipes [pipes...]', 'pipes to read')
-	.option('-c, --command <string>', 'command to run')
+	.option('-p, --pipes <pipes...>', 'pipes to read')
+	.option('-c, --command [string...]', 'command to run')
 	.action(({pipes, command}) =>
 	{
 		console.debug(`receiver command: ${command}`);
 
-		receiver = w.spawn(w.shlex.split(command));
+		receiver = w.spawn((command));
 		receiver.on('close', (code) =>
 		{
 			console.debug(`${receiver.pid} closed with code ${code}. exiting.`);
@@ -32,15 +32,21 @@ w.program
 			const stream = w.fs.createReadStream(p);
 			const decoder = new w.cbor.Decoder();
 			stream.pipe(decoder);
+
 			const source = {fn:p}
 			sources.push(source);
+			console.debug(`sources: ${sources.length}`);
 
 			decoder.on('end', () =>
 			{
-				console.log(`This is the end of decoder.`);
+				console.debug(`This is the end of decoder.`);
 				sources.splice(sources.indexOf(source), 1);
+				console.debug(`sources: ${sources.length}`);
+				/*
+				not until chunks.length === 0!
 				if (sources.length < 1)
 					receiver.stdin.end();
+				 */
 			});
 
 			decoder.on('error', function(err) {
@@ -50,10 +56,11 @@ w.program
 			decoder.on('data', (d) =>
 			{
 				const chunk_id = d.id;
-				console.warn(`got chunk_id: ${chunk_id}`);
+				console.debug(`got chunk_id: ${chunk_id}`);
 				chunks.insertOne(d);
 				try_pop();
 			})
+
 			return source;
 		});
 	});

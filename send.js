@@ -1,15 +1,12 @@
 "use strict";
 
-//CHUNK_SIZE_BYTES = 1000000000; // 1GB
-
 
 const pipe_commands = [
 	'ssh localhost "cat > /tmp/mooltipath_stream1"',
 	'ssh localhost "cat > /tmp/mooltipath_stream2"',
 ];
 
-// receiver_end = shlex_quote("wc -c");
-const join_command = 'ssh localhost mooltipath join -p /tmp/mooltipath_stream1 /tmp/mooltipath_stream2 -c cat '
+const join_command = "ssh localhost mooltipath join -p /tmp/mooltipath_stream1 /tmp/mooltipath_stream2 -c wc -c"
 
 
 const chunks = [];
@@ -42,7 +39,7 @@ w.program
 
 		process.stdin.on('data', data =>
 		{
-			console.log(`I got some ${data.length} bytes`);
+			console.debug(`I got some ${data.length} bytes`);
 			chunks.push({'id': next_chunk_id++, 'data': data});
 			if (try_send_chunks() === false)
 			{
@@ -64,10 +61,11 @@ w.program
 
 		process.stdin.on('close', () =>
 		{
-			console.log(`This is the end of stdin.`);
+			console.debug(`This is the end of stdin.`);
 			drains.forEach((p) =>
 			{
-				p.stdin.end();
+				//p.stdin.end();
+				// not until all chunks are written.
 				//p.kill('SIGHUP');
 			});
 		});
@@ -95,8 +93,10 @@ function try_send_chunk(ch)
 	//pipe.write(ch.data);
 
 	const msg = {'id': ch.id, 'data': ch.data};
-	pipe.write(w.cbor.encode(msg));
-	console.info(`wrote: ${JSON.stringify(msg)}`);
+	const bytes = w.cbor.encode(msg);
+	pipe.write(bytes);
+	//console.debug(`wrote: ${JSON.stringify(msg)}`);
+	console.debug(`wrote ${bytes.length} bytes..`);
 
 	return true;
 }
