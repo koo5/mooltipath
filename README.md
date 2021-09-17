@@ -16,6 +16,8 @@
 * 100000000x lighter than this https://www.multipath-tcp.org/ (but mooltipath only works for pipes / streams, whereas MPTCP transparently splits any TCP traffic).
 
 ## see also
+* https://news.ycombinator.com/item?id=8329507
+
 * https://www.quora.com/Is-there-a-way-to-aggregate-bandwidth-from-multiple-accessible-internet-connections-into-a-bigger-faster-connection
 
 * https://speedify.com/features/channel-bonding/

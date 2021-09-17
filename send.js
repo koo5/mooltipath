@@ -43,12 +43,15 @@ const join_command = w.shlex.split("ssh localhost mooltipath join")
 
 w.program
 	.command('send')
+    .requiredOption('--run <receiver_command>', 'Start command and pipe into it')
 	/*
 	receiver_command should be an option.
 	ssh commands for fifo_commands should be an option
 	*/
-	.action(() =>
+	.action((receiver_command) =>
 	{
+		console.debug(``);
+	
 		joiner = w.spawn(join_command);
 		
 		/* currently, commands always go straight to the master process. But convievably, they could be sent in parallell through the other streams too. This may be helpful when the original ssh connection is severed*/
