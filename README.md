@@ -23,3 +23,11 @@
 * https://speedify.com/features/channel-bonding/
 ^ splits your packets and recombines them (but only on their servers in the internet)
 
+* HPSSH
+
+## status
+this naive nodejs implementation ended up being even much slower than expected. But streams can work in this callback mode, or in a "direct"/polling? mode of calling read(), so there's still some hope for a js implementation. Another issue was that i couldn't find a js JSON or CBOR library that'd allow streaming parsing. 
+
+## future
+I'd like to build next version with C++,Qt and CBOR. 
+
